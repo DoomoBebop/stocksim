@@ -1,0 +1,180 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>stocksim — backtester</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=DM+Mono:ital,wght@0,300;0,400;0,500;1,300&family=Syne:wght@400;600;700;800&display=swap" rel="stylesheet" />
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+  <link rel="stylesheet" href="/static/css/style.css" />
+</head>
+<body>
+  <div class="bg-grid"></div>
+
+  <header>
+    <div class="logo">stock<span>sim</span></div>
+    <div class="tagline">backtester d'investissement · données yahoo finance</div>
+  </header>
+
+  <main>
+    <!-- ── ADD POSITION FORM ───────────────────────────────────── -->
+    <section class="panel form-panel">
+      <div class="panel-title">
+        <span class="panel-num">01</span> nouvelle position
+      </div>
+
+      <div class="form-grid">
+
+        <!-- Market -->
+        <div class="field-group">
+          <label>marché</label>
+          <select id="market" onchange="loadTickers()">
+            {% for m in markets %}
+            <option value="{{ m }}">{{ m }}</option>
+            {% endfor %}
+          </select>
+        </div>
+
+        <!-- Ticker -->
+        <div class="field-group">
+          <label>actif</label>
+          <div class="ticker-wrap">
+            <select id="ticker" onchange="fetchCurrentPrice()"></select>
+            <span id="live-price" class="live-price">—</span>
+          </div>
+        </div>
+
+        <!-- Product type -->
+        <div class="field-group">
+          <label>type de produit</label>
+          <select id="product-type">
+            <option value="stock">Action / Stock</option>
+            <option value="etf">ETF</option>
+            <option value="cfd">CFD</option>
+            <option value="option_call">Option CALL</option>
+            <option value="option_put">Option PUT (short)</option>
+          </select>
+        </div>
+
+        <!-- Leverage -->
+        <div class="field-group">
+          <label>levier <span class="hint">×1 = pas de levier</span></label>
+          <div class="leverage-row">
+            <input type="range" id="leverage-range" min="1" max="20" step="0.5" value="1"
+              oninput="document.getElementById('leverage-val').textContent = (+this.value).toFixed(1) + '×'" />
+            <span id="leverage-val" class="lev-badge">1.0×</span>
+          </div>
+        </div>
+
+        <!-- Amount -->
+        <div class="field-group">
+          <label>montant investi</label>
+          <div class="amount-row">
+            <input type="number" id="amount" value="1000" min="1" step="100" />
+            <span class="currency">€</span>
+          </div>
+        </div>
+
+        <!-- Separator -->
+        <div class="section-sep">
+          <span>conditions d'achat</span>
+        </div>
+
+        <!-- Buy type -->
+        <div class="field-group toggle-group">
+          <button class="toggle active" id="buy-date-btn" onclick="setBuyType('date')">par date</button>
+          <button class="toggle" id="buy-cond-btn" onclick="setBuyType('condition')">par condition</button>
+        </div>
+
+        <div id="buy-date-field" class="field-group">
+          <label>date d'achat</label>
+          <input type="date" id="buy-date" value="2023-01-01" />
+        </div>
+
+        <div id="buy-cond-field" class="field-group" style="display:none;">
+          <label>acheter quand le prix</label>
+          <div class="cond-row">
+            <select id="buy-op">
+              <option value="<">descend sous</option>
+              <option value=">">monte au-dessus de</option>
+            </select>
+            <input type="number" id="buy-val" placeholder="ex: 150" step="any" />
+            <span class="currency">€/unit</span>
+          </div>
+        </div>
+
+        <!-- Separator -->
+        <div class="section-sep">
+          <span>conditions de vente</span>
+        </div>
+
+        <!-- Sell type -->
+        <div class="field-group toggle-group">
+          <button class="toggle active" id="sell-date-btn" onclick="setSellType('date')">par date</button>
+          <button class="toggle" id="sell-cond-btn" onclick="setSellType('condition')">par condition</button>
+        </div>
+
+        <div id="sell-date-field" class="field-group">
+          <label>date de vente</label>
+          <input type="date" id="sell-date" value="2024-01-01" />
+        </div>
+
+        <div id="sell-cond-field" class="field-group" style="display:none;">
+          <label>vendre quand le prix</label>
+          <div class="cond-row">
+            <select id="sell-op">
+              <option value=">">monte au-dessus de</option>
+              <option value="<">descend sous</option>
+            </select>
+            <input type="number" id="sell-val" placeholder="ex: 200" step="any" />
+            <span class="currency">€/unit</span>
+          </div>
+        </div>
+
+      </div><!-- /form-grid -->
+
+      <button class="add-btn" onclick="addPosition()">
+        <span>+ ajouter à la liste</span>
+      </button>
+
+    </section>
+
+    <!-- ── POSITION LIST ───────────────────────────────────────── -->
+    <section class="panel list-panel">
+      <div class="panel-title">
+        <span class="panel-num">02</span> positions
+        <span class="badge" id="pos-count">0</span>
+      </div>
+      <div id="position-list" class="position-list">
+        <div class="empty-state">aucune position — ajoutez-en une ci-dessus</div>
+      </div>
+      <div class="sim-bar">
+        <div class="total-invested">
+          investi : <span id="total-invested">0 €</span>
+        </div>
+        <button class="sim-btn" id="sim-btn" onclick="runSimulation()" disabled>
+          simuler tout →
+        </button>
+      </div>
+    </section>
+
+    <!-- ── RESULTS ─────────────────────────────────────────────── -->
+    <section class="panel results-panel" id="results-panel" style="display:none;">
+      <div class="panel-title">
+        <span class="panel-num">03</span> résultats
+      </div>
+
+      <div class="summary-row" id="summary-row"></div>
+      <div class="results-list" id="results-list"></div>
+    </section>
+
+  </main>
+
+  <footer>
+    données via yahoo finance · simulation uniquement · pas de conseil financier
+  </footer>
+
+  <script src="/static/js/app.js"></script>
+</body>
+</html>
