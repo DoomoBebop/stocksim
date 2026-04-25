@@ -25,9 +25,24 @@ Simulateur de stratégies d'investissement basé sur des données historiques r�
 | Composant | Technologie |
 |-----------|-------------|
 | Backend   | Python / Flask |
-| Données   | yfinance (Yahoo Finance API) |
+| Données   | yfinance, Stooq, Binance API, FRED |
 | Frontend  | HTML + CSS + Vanilla JS |
 | Charts    | Chart.js |
+
+---
+
+## Sources de données
+
+Choisissez la source via le menu déroulant dans l'interface. Une note contextuelle s'affiche pour rappeler le bon format de ticker.
+
+| Source | Gratuit | Couverture | Format ticker |
+|--------|---------|------------|---------------|
+| **Yahoo Finance** | ✅ | Actions, ETF, crypto, indices — historique illimité | `AAPL`, `BTC-USD`, `MC.PA`, `^GSPC` |
+| **Stooq** | ✅ | Actions US, EU, JP | `AAPL.US`, `CDR.PL`, `7203.JP` |
+| **Binance API** | ✅ | Crypto uniquement — très fiable | `BTC-USD`, `ETH-USD`, `SOL-USD` |
+| **FRED** | ✅ | Données macro — taux, indices éco, inflation | `SP500`, `NASDAQCOM`, `DGS10`, `CPIAUCSL` |
+
+> Google Finance n'a plus d'API publique depuis 2012. Alpha Vantage est gratuit mais limité à 25 calls/jour sans clé API.
 
 ---
 
