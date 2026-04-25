@@ -7,6 +7,10 @@ let chartRefs  = {};   // chart.js instances keyed by position id
 /* ── Init ───────────────────────────────────────────────────── */
 document.addEventListener('DOMContentLoaded', () => {
   loadTickers();
+  // Cap date inputs to today
+  const todayStr = new Date().toISOString().slice(0, 10);
+  document.getElementById('buy-date').max  = todayStr;
+  document.getElementById('sell-date').max = todayStr;
   // Default dates: 1 year ago → today
   const today = new Date();
   const oneYearAgo = new Date(today);
@@ -146,6 +150,17 @@ function addPosition() {
   const tickerSel = document.getElementById('ticker');
   const ticker    = tickerSel.value;
   const tickerLabel = tickerSel.options[tickerSel.selectedIndex].text;
+
+  // Validate dates are in the past
+  const today = new Date().toISOString().slice(0, 10);
+  if (buyType === 'date' && document.getElementById('buy-date').value > today) {
+    alert('⚠ La date d\'achat ne peut pas être dans le futur. Le simulateur teste uniquement des données historiques.');
+    return;
+  }
+  if (sellType === 'date' && document.getElementById('sell-date').value > today) {
+    alert('⚠ La date de vente ne peut pas être dans le futur.');
+    return;
+  }
 
   const pos = {
     id: Date.now(),

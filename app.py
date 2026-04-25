@@ -381,7 +381,7 @@ def simulate():
         target = pd.Timestamp(data["buy_date"])
         future = prices[prices.index >= target]
         if future.empty:
-            return jsonify({"error": "Buy date is beyond available data or in the future"}), 400
+            return jsonify({"error": f"La date d'achat ({data['buy_date']}) est dans le futur ou au-delà des données disponibles. Le simulateur ne peut tester que des dates passées."}), 400
         buy_date_actual = future.index[0]
         buy_price = float(future.iloc[0])
         buy_note = f"Achete le {buy_date_actual.date()} a {buy_price:.4f}."
