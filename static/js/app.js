@@ -68,17 +68,75 @@ function setSellType(type) {
 }
 
 /* ── Source change ──────────────────────────────────────────── */
-const SOURCE_NOTES = {
-  yahoo:   "Tickers standards : AAPL, BTC-USD, SPY, MC.PA…",
-  stooq:   "Tickers Stooq : AAPL.US, CDR.PL, PKN.PL… Vérifiez sur stooq.com",
-  binance: "Crypto uniquement. Format: BTC-USD, ETH-USD, SOL-USD…",
-  fred:    "Identifiants FRED : SP500, NASDAQCOM, DJIA, DGS10, CPIAUCSL, UNRATE…",
+const SOURCE_CONFIG = {
+  yahoo: {
+    note: "Tickers standards : AAPL, BTC-USD, SPY, MC.PA…",
+    markets: ["S&P 500", "CAC 40", "NASDAQ 100", "Crypto", "ETF"],
+    products: ["stock", "etf", "cfd", "option_call", "option_put"],
+  },
+  stooq: {
+    note: "Tickers Stooq : AAPL.US, CDR.PL… Vérifiez sur stooq.com",
+    markets: ["S&P 500", "NASDAQ 100", "CAC 40"],
+    products: ["stock", "etf"],
+  },
+  binance: {
+    note: "Crypto uniquement. Format: BTC-USD, ETH-USD, SOL-USD… (fallback Yahoo si région bloquée)",
+    markets: ["Crypto"],
+    products: ["stock", "cfd"],
+  },
+  fred: {
+    note: "Identifiants FRED : SP500, NASDAQCOM, DJIA, DGS10, CPIAUCSL… Pas de levier possible.",
+    markets: ["S&P 500", "NASDAQ 100"],
+    products: ["stock"],
+  },
 };
 
+const ALL_MARKETS = ["S&P 500", "CAC 40", "NASDAQ 100", "Crypto", "ETF"];
+const ALL_PRODUCTS = [
+  { value: "stock",       label: "Action / Stock" },
+  { value: "etf",         label: "ETF" },
+  { value: "cfd",         label: "CFD" },
+  { value: "option_call", label: "Option CALL" },
+  { value: "option_put",  label: "Option PUT (short)" },
+];
+
 function onSourceChange() {
-  const src = document.getElementById('data-source').value;
-  const note = document.getElementById('source-note');
-  note.textContent = SOURCE_NOTES[src] || '';
+  const src    = document.getElementById('data-source').value;
+  const cfg    = SOURCE_CONFIG[src];
+  const note   = document.getElementById('source-note');
+  note.textContent = cfg.note;
+
+  // Filter market dropdown
+  const marketSel = document.getElementById('market');
+  const curMarket = marketSel.value;
+  marketSel.innerHTML = ALL_MARKETS
+    .filter(m => cfg.markets.includes(m))
+    .map(m => `<option value="${m}" ${m === curMarket ? 'selected' : ''}>${m}</option>`)
+    .join('');
+  // If current market not available, reset to first
+  if (!cfg.markets.includes(curMarket)) {
+    marketSel.value = cfg.markets[0];
+  }
+  loadTickers();
+
+  // Filter product dropdown
+  const prodSel = document.getElementById('product-type');
+  const curProd = prodSel.value;
+  prodSel.innerHTML = ALL_PRODUCTS
+    .filter(p => cfg.products.includes(p.value))
+    .map(p => `<option value="${p.value}" ${p.value === curProd ? 'selected' : ''}>${p.label}</option>`)
+    .join('');
+
+  // Disable leverage for FRED
+  const levRange = document.getElementById('leverage-range');
+  if (src === 'fred') {
+    levRange.value = 1;
+    levRange.disabled = true;
+    document.getElementById('leverage-val').textContent = '1.0×';
+  } else {
+    levRange.disabled = false;
+  }
+
   fetchCurrentPrice();
 }
 

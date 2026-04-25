@@ -27,7 +27,11 @@ def fetch_history(ticker, start_date, end_date, source="yahoo"):
                            auto_adjust=True, progress=False)
         if hist.empty:
             raise ValueError(f"Aucune donnée Yahoo Finance pour {ticker}")
-        return hist["Close"].dropna()
+        close = hist["Close"]
+        # yfinance >=0.2.x may return DataFrame with MultiIndex columns
+        if isinstance(close, pd.DataFrame):
+            close = close.iloc[:, 0]
+        return close.dropna()
 
     # ── Stooq ─────────────────────────────────────────────────────────────────
     elif source == "stooq":
@@ -44,27 +48,38 @@ def fetch_history(ticker, start_date, end_date, source="yahoo"):
         except Exception:
             raise ValueError(f"Stooq : impossible de charger {ticker}. Vérifiez le ticker (ex: AAPL.US, CDR.PL)")
 
-    # ── Binance (crypto only) ─────────────────────────────────────────────────
+    # ── Binance (crypto only) — fallback to Yahoo if geo-blocked ────────────
     elif source == "binance":
-        # Convert ticker format: BTC-USD → BTCUSDT
         symbol = ticker.upper().replace("-USD", "USDT").replace("-USDT", "USDT").replace("/", "")
         if not symbol.endswith("USDT"):
             symbol = symbol + "USDT"
         s_ms = int(start.timestamp() * 1000)
         e_ms = int(end.timestamp() * 1000)
-        url  = (f"https://api.binance.com/api/v3/klines"
-                f"?symbol={symbol}&interval=1d&startTime={s_ms}&endTime={e_ms}&limit=1000")
-        try:
-            req  = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
-            with urllib.request.urlopen(req, timeout=10) as r:
-                data = json.loads(r.read())
-            if not data or isinstance(data, dict):
-                raise ValueError("empty or error")
-            dates  = [pd.Timestamp(d[0], unit="ms") for d in data]
-            closes = [float(d[4]) for d in data]
-            return pd.Series(closes, index=dates, name="Close").dropna()
-        except Exception as ex:
-            raise ValueError(f"Binance : impossible de charger {symbol}. Crypto uniquement (ex: BTC-USD). {ex}")
+        # Try Binance.com first, then binance.us, then fallback Yahoo
+        endpoints = [
+            f"https://api.binance.com/api/v3/klines?symbol={symbol}&interval=1d&startTime={s_ms}&endTime={e_ms}&limit=1000",
+            f"https://api.binance.us/api/v3/klines?symbol={symbol}&interval=1d&startTime={s_ms}&endTime={e_ms}&limit=1000",
+        ]
+        for url in endpoints:
+            try:
+                req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
+                with urllib.request.urlopen(req, timeout=8) as r:
+                    data = json.loads(r.read())
+                if data and isinstance(data, list):
+                    dates  = [pd.Timestamp(d[0], unit="ms") for d in data]
+                    closes = [float(d[4]) for d in data]
+                    return pd.Series(closes, index=dates, name="Close").dropna()
+            except Exception:
+                continue
+        # Geo-blocked or unavailable — fallback to Yahoo Finance for crypto
+        hist = yf.download(ticker, start=start_date, end=end_date,
+                           auto_adjust=True, progress=False)
+        if hist.empty:
+            raise ValueError(f"Binance indisponible dans votre région et Yahoo Finance n'a pas de données pour {ticker}.")
+        close = hist["Close"]
+        if isinstance(close, pd.DataFrame):
+            close = close.iloc[:, 0]
+        return close.dropna()
 
     # ── FRED ─────────────────────────────────────────────────────────────────
     elif source == "fred":
