@@ -67,6 +67,22 @@ function setSellType(type) {
   document.getElementById('sell-cond-btn').classList.toggle('active', type === 'condition');
 }
 
+/* ── Source change ──────────────────────────────────────────── */
+const SOURCE_NOTES = {
+  yahoo:   "Tickers standards : AAPL, BTC-USD, SPY, MC.PA…",
+  stooq:   "Tickers Stooq : AAPL.US, CDR.PL, PKN.PL… Vérifiez sur stooq.com",
+  binance: "Crypto uniquement. Format: BTC-USD, ETH-USD, SOL-USD…",
+  fred:    "Identifiants FRED : SP500, NASDAQCOM, DJIA, DGS10, CPIAUCSL, UNRATE…",
+};
+
+function onSourceChange() {
+  const src = document.getElementById('data-source').value;
+  const note = document.getElementById('source-note');
+  note.textContent = SOURCE_NOTES[src] || '';
+  fetchCurrentPrice();
+}
+
+
 /* ── Add position ───────────────────────────────────────────── */
 function addPosition() {
   const tickerSel = document.getElementById('ticker');
@@ -78,6 +94,7 @@ function addPosition() {
     ticker,
     tickerLabel,
     market:        document.getElementById('market').value,
+    source:        document.getElementById('data-source').value,
     product_type:  document.getElementById('product-type').value,
     leverage:      parseFloat(document.getElementById('leverage-range').value),
     amount:        parseFloat(document.getElementById('amount').value) || 1000,
@@ -169,6 +186,7 @@ async function runSimulation() {
     const payload = {
       ticker:    pos.ticker,
       market:    pos.market,
+      source:    pos.source,
       buy_type:  pos.buy_type,
       buy_date:  pos.buy_date,
       buy_condition_op:    pos.buy_condition_op,
@@ -289,7 +307,7 @@ function renderResults(results) {
         <div class="rc-left">
           <div class="rc-ticker">${data.ticker}</div>
           <div class="rc-meta">
-            ${prodLabel}${levNote} · ${data.amount_invested.toLocaleString('fr-FR')} € investis<br>
+            ${prodLabel}${levNote} · via <span style="color:var(--accent)">${data.source || 'yahoo'}</span> · ${data.amount_invested.toLocaleString('fr-FR')} € investis<br>
             achat le ${data.buy_date} @ ${data.buy_price.toLocaleString('fr-FR', { minimumFractionDigits: 2 })} · vente le ${data.sell_date} @ ${data.sell_price.toLocaleString('fr-FR', { minimumFractionDigits: 2 })}<br>
             ${data.shares.toLocaleString('fr-FR', { maximumFractionDigits: 4 })} unités ${data.leverage > 1 ? '(position avec levier)' : ''}
           </div>

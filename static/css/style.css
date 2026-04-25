@@ -524,3 +524,12 @@ footer {
   .pos-item { grid-template-columns: 60px 1fr auto auto; }
   .pos-lev  { display: none; }
 }
+
+/* ── Source note ────────────────────────────────────────────── */
+.source-note {
+  font-size: 11px;
+  color: var(--accent);
+  opacity: 0.7;
+  margin-top: 4px;
+  min-height: 16px;
+}
