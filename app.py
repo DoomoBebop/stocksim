@@ -359,16 +359,22 @@ def simulate():
     leverage     = float(data.get("leverage", 1))
     product_type = data.get("product_type", "stock")
 
-    end_date   = datetime.today()
-    start_date = end_date - timedelta(days=5 * 365)
+    today      = datetime.today()
+    # Start fetch from 30 days before buy date (or 5y ago max) to today+1
+    if buy_type == "date" and data.get("buy_date"):
+        fetch_start = (pd.Timestamp(data["buy_date"]) - timedelta(days=30)).strftime("%Y-%m-%d")
+    else:
+        fetch_start = (today - timedelta(days=5 * 365)).strftime("%Y-%m-%d")
+    fetch_end = (today + timedelta(days=1)).strftime("%Y-%m-%d")
 
     try:
-        prices = fetch_history(ticker, start_date.strftime("%Y-%m-%d"),
-                               end_date.strftime("%Y-%m-%d"), source=source)
+        prices = fetch_history(ticker, fetch_start, fetch_end, source=source)
         if prices.empty:
-            return jsonify({"error": f"Aucune donnee pour {ticker} via {source}"}), 400
+            return jsonify({"error": f"Aucune donnée pour {ticker} via {source}. Vérifiez le ticker et la source."}), 400
         prices.index = pd.to_datetime(prices.index)
         prices = prices.sort_index().dropna()
+        if len(prices) < 2:
+            return jsonify({"error": f"Données insuffisantes pour {ticker} sur la période demandée."}), 400
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
