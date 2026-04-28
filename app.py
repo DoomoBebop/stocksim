@@ -103,28 +103,36 @@ def fetch_history(ticker, start_date, end_date, source="yahoo"):
             close = close.iloc[:, 0]
         return close.dropna()
 
-    # ── FRED ─────────────────────────────────────────────────────────────────
+    # ── FRED — fallback Yahoo si série inconnue ──────────────────────────────
     elif source == "fred":
-        # FRED series IDs: SP500, NASDAQCOM, DJIA, DGS10, CPIAUCSL, etc.
         series = ticker.upper()
         s = start.strftime("%Y-%m-%d")
         e = end.strftime("%Y-%m-%d")
-        url = (f"https://fred.stlouisfed.org/graph/fredgraph.csv"
-               f"?id={series}&vintage_date={e}")
         try:
+            url = (f"https://fred.stlouisfed.org/graph/fredgraph.csv"
+                   f"?id={series}&vintage_date={e}")
             df = pd.read_csv(url, parse_dates=["DATE"], index_col="DATE",
                              na_values=[".", ""])
             df = df.dropna()
-            if df.empty:
-                raise ValueError("empty")
-            col = df.columns[0]
-            series_data = df[col].astype(float)
-            series_data = series_data[(series_data.index >= start) & (series_data.index <= end)]
-            if series_data.empty:
-                raise ValueError("no data in range")
-            return series_data.dropna()
+            if not df.empty:
+                col = df.columns[0]
+                series_data = df[col].astype(float)
+                series_data = series_data[(series_data.index >= start) & (series_data.index <= end)]
+                if len(series_data) >= 2:
+                    return series_data.dropna()
         except Exception:
-            raise ValueError(f"FRED : série '{series}' introuvable. Ex: SP500, NASDAQCOM, DJIA, DGS10, CPIAUCSL")
+            pass
+        # FRED failed — silently fallback to Yahoo Finance
+        hist = yf.download(ticker, start=start_date, end=end_date,
+                           auto_adjust=True, progress=False)
+        if not hist.empty:
+            close = hist["Close"]
+            if isinstance(close, pd.DataFrame):
+                close = close.iloc[:, 0]
+            result = close.dropna()
+            if len(result) >= 2:
+                return result
+        raise ValueError(f"Impossible de charger '{ticker}' via FRED ou Yahoo Finance. Vérifiez le ticker.")
 
 # ── Market index definitions ──────────────────────────────────────────────────
 MARKETS = {
