@@ -35,18 +35,43 @@ def fetch_history(ticker, start_date, end_date, source="yahoo"):
 
     # ── Stooq ─────────────────────────────────────────────────────────────────
     elif source == "stooq":
-        # Stooq uses lowercase ticker, dots for some indices
-        t = ticker.lower().replace("-", ".").replace("^", "")
+        # Auto-convert ticker to Stooq format
+        t = ticker.lower().replace("^", "").replace("/", ".")
+        # If no exchange suffix, assume US stock
+        if "." not in t and "-" not in t:
+            t = t + ".us"
+        t = t.replace("-", ".")
         s = start.strftime("%Y%m%d")
         e = end.strftime("%Y%m%d")
+        headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"}
         url = f"https://stooq.com/q/d/l/?s={t}&d1={s}&d2={e}&i=d"
         try:
-            df = pd.read_csv(url, parse_dates=["Date"], index_col="Date")
+            req = urllib.request.Request(url, headers=headers)
+            with urllib.request.urlopen(req, timeout=10) as r:
+                raw = r.read().decode()
+            from io import StringIO
+            df = pd.read_csv(StringIO(raw), parse_dates=["Date"], index_col="Date")
             if df.empty or "Close" not in df.columns:
                 raise ValueError("empty")
-            return df["Close"].dropna().sort_index()
-        except Exception:
-            raise ValueError(f"Stooq : impossible de charger {ticker}. Vérifiez le ticker (ex: AAPL.US, CDR.PL)")
+            series = df["Close"].dropna().sort_index()
+            if len(series) < 2:
+                raise ValueError("too short")
+            return series
+        except ValueError as ve:
+            raise ValueError(f"Stooq : aucune donnée pour '{t}'. Essayez le format complet ex: AAPL.US, CDR.PL, 7203.JP")
+        except Exception as ex:
+            # Fallback to Yahoo if Stooq fails (geo-block, rate limit, etc.)
+            try:
+                hist = yf.download(ticker, start=start_date, end=end_date,
+                                   auto_adjust=True, progress=False)
+                if not hist.empty:
+                    close = hist["Close"]
+                    if isinstance(close, pd.DataFrame):
+                        close = close.iloc[:, 0]
+                    return close.dropna()
+            except Exception:
+                pass
+            raise ValueError(f"Stooq indisponible ({ex}). Essayez Yahoo Finance pour {ticker}.")
 
     # ── Binance (crypto only) — fallback to Yahoo if geo-blocked ────────────
     elif source == "binance":
